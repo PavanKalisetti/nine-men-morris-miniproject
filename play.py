@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 import time
 
-# Define the Neural Network model using PyTorch (unchanged)
+
 class DQNetwork(nn.Module):
     def __init__(self, state_size=24, action_size=24):
         super(DQNetwork, self).__init__()
@@ -24,19 +24,19 @@ class DQNetwork(nn.Module):
 
 class NineMensMorrisEnv:
     def __init__(self):
-        # Board: 0 = empty, 1 = player 1, 2 = player 2
+        
         self.board = [0] * 24
-        self.phase = 'placement'  # placement, movement, flying
+        self.phase = 'placement'  
         self.remaining_pieces = {1: 9, 2: 9}
         self.pieces_on_board = {1: 0, 2: 0}
         self.mills = []
-        # All possible mills for checking potential mills
+        
         self.all_mills = [
-            [0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11], [12, 13, 14], [15, 16, 17], [18, 19, 20], [21, 22, 23],  # Horizontal
-            [0, 9, 21], [3, 10, 18], [6, 11, 15], [1, 4, 7], [16, 19, 22], [8, 12, 17], [5, 13, 20], [2, 14, 23]  # Vertical
+            [0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11], [12, 13, 14], [15, 16, 17], [18, 19, 20], [21, 22, 23],  
+            [0, 9, 21], [3, 10, 18], [6, 11, 15], [1, 4, 7], [16, 19, 22], [8, 12, 17], [5, 13, 20], [2, 14, 23]  
         ]
-        # Central positions with high connectivity
-        self.central_positions = [4, 10, 13, 16, 19] # remove 16
+        
+        self.central_positions = [4, 10, 13, 16, 19] 
 
     def reset(self):
         self.board = [0] * 24
@@ -123,8 +123,8 @@ class NineMensMorrisEnv:
             if valid_move:
                 self.board[from_pos] = 0
                 self.board[to_pos] = player
-                # Update mills to remove any broken by the move
-                self.update_mills()  # Added line
+                
+                self.update_mills()  
                 return self.check_mill(to_pos, player)
         return False
 
@@ -187,10 +187,10 @@ class NineMensMorrisEnv:
 
     def step(self, action, player):
         opponent = 3 - player
-        # Copy board state before the move
+        
         prev_board = self.board.copy()
 
-        # Apply the action
+        
         if self.phase == 'placement':
             formed_mill = self.place_piece(action, player)
         else:
@@ -200,7 +200,7 @@ class NineMensMorrisEnv:
         reward = 0
         done = False
 
-        # Handle mill formation and piece removal
+        
         if formed_mill and self.can_remove(opponent):
             for pos in range(24):
                 if self.board[pos] == opponent:
@@ -220,7 +220,7 @@ class NineMensMorrisEnv:
                         reward += 2.0
                         break
 
-        # Check for win/loss
+        
         winner = self.check_winner()
         if winner == player:
             reward += 10.0
@@ -229,42 +229,42 @@ class NineMensMorrisEnv:
             reward += -10.0
             done = True
 
-        # Strategic rewards
+        
         if formed_mill:
-            reward += 1.0  # Forming a mill
+            reward += 1.0  
 
-        # Occupying central position
+        
         if self.phase == 'placement':
             if action in self.central_positions:
                 reward += 0.05
         else:
-            # _, to_pos = action
+            
             to_pos=action
             if to_pos in self.central_positions:
                 reward += 0.05
 
-        # Forming potential mills
+        
         prev_potential_player = self.get_potential_mills(prev_board, player)
         current_potential_player = self.get_potential_mills(self.board, player)
         new_potential_mills = set(tuple(sorted(m)) for m in current_potential_player) - set(tuple(sorted(m)) for m in prev_potential_player)
         reward += 0.1 * len(new_potential_mills)
 
-        # Blocking opponent's potential mills
+        
         prev_potential_opponent = self.get_potential_mills(prev_board, opponent)
         current_potential_opponent = self.get_potential_mills(self.board, opponent)
         blocked_mills = set(tuple(sorted(m)) for m in prev_potential_opponent) - set(tuple(sorted(m)) for m in current_potential_opponent)
         reward += 0.5 * len(blocked_mills)
 
-        # Piece advantage
+        
         piece_diff = self.pieces_on_board[player] - self.pieces_on_board[opponent]
         reward += 0.2 * piece_diff
 
-        # Default penalty per move
+        
         reward += -0.05
 
         return self.get_state(), reward, done
 
-# The rest of your code (e.g., DQNAgent, training loop) can remain unchanged unless further modifications are needed.
+
 
 
 class DQNAgent:
@@ -287,7 +287,7 @@ class DQNAgent:
         self.epsilon_decay = 0.995
         self.batch_size = 32
 
-        # Training stats for saving
+        
         self.total_episodes = 0
 
     def update_target_model(self):
@@ -297,7 +297,7 @@ class DQNAgent:
         self.replay_buffer.append((state, action, reward, next_state, done))
 
     def act(self, state, valid_actions, epsilon_override=None):
-        # Use provided epsilon if given, otherwise use the agent's epsilon
+        
         epsilon = epsilon_override if epsilon_override is not None else self.epsilon
 
         if np.random.rand() <= epsilon:
@@ -307,19 +307,19 @@ class DQNAgent:
         with torch.no_grad():
             q_values = self.model(state_tensor).cpu().numpy()[0]
 
-        # For placement phase, valid_actions are integers
+        
         if isinstance(valid_actions[0], (int, np.int64)):
             q_valid = [-float('inf')] * self.action_size
             for a in valid_actions:
                 q_valid[a] = q_values[a]
             return np.argmax(q_valid)
-        # For movement phase, valid_actions are tuples
+        
         else:
             best_action = valid_actions[0]
             best_q = -float('inf')
             for action in valid_actions:
                 from_pos, to_pos = action
-                # Simple heuristic - use average of from and to positions
+                
                 action_idx = (from_pos + to_pos) % self.action_size
                 if q_values[action_idx] > best_q:
                     best_q = q_values[action_idx]
@@ -334,55 +334,55 @@ class DQNAgent:
 
         states = np.array([x[0] for x in minibatch])
 
-        # Handle both integer actions and tuple actions
+        
         actions_raw = [x[1] for x in minibatch]
         actions = []
         for a in actions_raw:
             if isinstance(a, (int, np.int64)):
                 actions.append(a)
             else:
-                # For movement actions (tuples), use a simple mapping
+                
                 from_pos, to_pos = a
                 actions.append((from_pos + to_pos) % self.action_size)
 
-        # Convert actions to proper format for gathering
+        
         action_indices = []
         for a in actions:
             if isinstance(a, (int, np.int64)):
                 action_indices.append(a)
             elif isinstance(a, tuple):
-                action_indices.append(a[0])  # Just use the first element for simplicity
+                action_indices.append(a[0])  
             else:
-                # This is a fallback - shouldn't normally be reached
+                
                 action_indices.append(0)
 
         rewards = np.array([x[2] for x in minibatch])
         next_states = np.array([x[3] for x in minibatch])
         dones = np.array([x[4] for x in minibatch])
 
-        # Convert to PyTorch tensors
+        
         states_tensor = torch.FloatTensor(states).to(self.device)
         next_states_tensor = torch.FloatTensor(next_states).to(self.device)
         actions_tensor = torch.LongTensor(action_indices).unsqueeze(1).to(self.device)
         rewards_tensor = torch.FloatTensor(rewards).to(self.device)
         dones_tensor = torch.FloatTensor(dones).to(self.device)
 
-        # Current Q values
+        
         current_q = self.model(states_tensor).gather(1, actions_tensor)
 
-        # Next Q values from target model
+        
         with torch.no_grad():
             next_q = torch.zeros(self.batch_size, device=self.device)
             next_max_q = self.target_model(next_states_tensor).max(1)[0]
             next_q = rewards_tensor + (1 - dones_tensor) * self.gamma * next_max_q
 
-        # Calculate target Q values
+        
         target_q = next_q.unsqueeze(1)
 
-        # Compute loss
+        
         loss = self.criterion(current_q, target_q)
 
-        # Optimize the model
+        
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -391,7 +391,7 @@ class DQNAgent:
             self.epsilon *= self.epsilon_decay
 
     def save(self, filename):
-        # Convert replay buffer to a list for better compatibility
+        
         replay_list = list(self.replay_buffer)
 
         checkpoint = {
@@ -408,11 +408,11 @@ class DQNAgent:
     def load(self, filename):
         if os.path.exists(filename):
             try:
-                # Check if weights_only parameter is supported
+                
                 try:
                     checkpoint = torch.load(filename, map_location=self.device, weights_only=False)
                 except TypeError:
-                    # If weights_only is not supported, use default parameters
+                    
                     checkpoint = torch.load(filename, map_location=self.device)
 
                 self.model.load_state_dict(checkpoint['model_state_dict'])
@@ -420,13 +420,13 @@ class DQNAgent:
                 self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
                 self.epsilon = checkpoint['epsilon']
 
-                # Only restore replay buffer if it exists in checkpoint
+                
                 if 'replay_buffer' in checkpoint:
                     self.replay_buffer = deque(maxlen=2000)
                     for item in checkpoint['replay_buffer']:
                         self.replay_buffer.append(item)
 
-                # Load training stats
+                
                 if 'total_episodes' in checkpoint:
                     self.total_episodes = checkpoint['total_episodes']
 
@@ -442,15 +442,15 @@ class DQNAgent:
 def select_action(env, agent, player, difficulty):
     valid_actions = env.get_valid_actions(player)
 
-    # Determine behavior based on difficulty
+    
     if difficulty == "easy":
-        # Easy mode: 70% random, 30% smart
+        
         if np.random.random() < 0.7:
             return random.choice(valid_actions)
 
-        # Check for immediate mill formation
+        
         for action in valid_actions:
-            # Clone environment to test action
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -458,7 +458,7 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Try action
+            
             if env.phase == 'placement':
                 if test_env.place_piece(action, player):
                     return action
@@ -467,17 +467,17 @@ def select_action(env, agent, player, difficulty):
                 if test_env.move_piece(from_pos, to_pos, player):
                     return action
 
-        # Otherwise random
+        
         return random.choice(valid_actions)
 
     elif difficulty == "moderate":
-        # Moderate mode: 30% random, 70% smart
+        
         if np.random.random() < 0.3:
             return random.choice(valid_actions)
 
-        # Check for immediate mill formation
+        
         for action in valid_actions:
-            # Clone environment to test action
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -485,7 +485,7 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Try action
+            
             if env.phase == 'placement':
                 if test_env.place_piece(action, player):
                     return action
@@ -494,12 +494,12 @@ def select_action(env, agent, player, difficulty):
                 if test_env.move_piece(from_pos, to_pos, player):
                     return action
 
-        # Check for opponent's potential mills to block
+        
         opponent = 3 - player
         opponent_actions = env.get_valid_actions(opponent)
 
         for opp_action in opponent_actions:
-            # Clone environment to test opponent's move if we did nothing
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -507,7 +507,7 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Check if opponent would form mill with this move
+            
             will_form_mill = False
             if test_env.phase == 'placement':
                 will_form_mill = test_env.place_piece(opp_action, opponent)
@@ -515,10 +515,10 @@ def select_action(env, agent, player, difficulty):
                 from_pos, to_pos = opp_action
                 will_form_mill = test_env.move_piece(from_pos, to_pos, opponent)
 
-            # If opponent would form mill, find moves to block it
+            
             if will_form_mill:
                 for action in valid_actions:
-                    # Clone environment again to test our move
+                    
                     block_test_env = NineMensMorrisEnv()
                     block_test_env.board = env.board.copy()
                     block_test_env.phase = env.phase
@@ -526,34 +526,34 @@ def select_action(env, agent, player, difficulty):
                     block_test_env.pieces_on_board = env.pieces_on_board.copy()
                     block_test_env.mills = [mill.copy() for mill in env.mills]
 
-                    # Apply our action
+                    
                     if env.phase == 'placement':
                         block_test_env.place_piece(action, player)
                     else:
                         from_pos, to_pos = action
                         block_test_env.move_piece(from_pos, to_pos, player)
 
-                    # Now check if opponent's mill-forming move is still possible
+                    
                     if env.phase == 'placement':
-                        # In placement phase, check if the position is still available
+                        
                         if block_test_env.board[opp_action] != 0:
-                            return action  # We blocked it by placing here
+                            return action  
                     else:
-                        # In movement phase, need to check if the destination is blocked
+                        
                         from_pos, to_pos = opp_action
                         if block_test_env.board[to_pos] != 0:
-                            return action  # We blocked it
+                            return action  
 
-        # Use the trained agent with some exploration
+        
         state = env.get_state()
         return agent.act(state, valid_actions, epsilon_override=0.2)
 
-    else:  # difficult
-        # Hard mode: Always check for strategic moves, then use trained agent
+    else:  
+        
 
-        # Check for immediate mill formation
+        
         for action in valid_actions:
-            # Clone environment to test action
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -561,7 +561,7 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Try action
+            
             if env.phase == 'placement':
                 if test_env.place_piece(action, player):
                     return action
@@ -570,12 +570,12 @@ def select_action(env, agent, player, difficulty):
                 if test_env.move_piece(from_pos, to_pos, player):
                     return action
 
-        # Block opponent's potential mills
+        
         opponent = 3 - player
         opponent_actions = env.get_valid_actions(opponent)
 
         for opp_action in opponent_actions:
-            # Clone environment to test opponent's move if we did nothing
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -583,7 +583,7 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Check if opponent would form mill with this move
+            
             will_form_mill = False
             if test_env.phase == 'placement':
                 will_form_mill = test_env.place_piece(opp_action, opponent)
@@ -591,10 +591,10 @@ def select_action(env, agent, player, difficulty):
                 from_pos, to_pos = opp_action
                 will_form_mill = test_env.move_piece(from_pos, to_pos, opponent)
 
-            # If opponent would form mill, find moves to block it
+            
             if will_form_mill:
                 for action in valid_actions:
-                    # Clone environment again to test our move
+                    
                     block_test_env = NineMensMorrisEnv()
                     block_test_env.board = env.board.copy()
                     block_test_env.phase = env.phase
@@ -602,27 +602,27 @@ def select_action(env, agent, player, difficulty):
                     block_test_env.pieces_on_board = env.pieces_on_board.copy()
                     block_test_env.mills = [mill.copy() for mill in env.mills]
 
-                    # Apply our action
+                    
                     if env.phase == 'placement':
                         block_test_env.place_piece(action, player)
                     else:
                         from_pos, to_pos = action
                         block_test_env.move_piece(from_pos, to_pos, player)
 
-                    # Now check if opponent's mill-forming move is still possible
+                    
                     if env.phase == 'placement':
-                        # In placement phase, check if the position is still available
+                        
                         if block_test_env.board[opp_action] != 0:
-                            return action  # We blocked it by placing here
+                            return action  
                     else:
-                        # In movement phase, need to check if the destination is blocked
+                        
                         from_pos, to_pos = opp_action
                         if block_test_env.board[to_pos] != 0:
-                            return action  # We blocked it
+                            return action  
 
-        # Check for setting up potential mills (2 in a row)
+        
         for action in valid_actions:
-            # Clone environment to test action
+            
             test_env = NineMensMorrisEnv()
             test_env.board = env.board.copy()
             test_env.phase = env.phase
@@ -630,52 +630,52 @@ def select_action(env, agent, player, difficulty):
             test_env.pieces_on_board = env.pieces_on_board.copy()
             test_env.mills = [mill.copy() for mill in env.mills]
 
-            # Apply action
+            
             if env.phase == 'placement':
                 test_env.place_piece(action, player)
-                pos = action  # For checking adjacent positions
+                pos = action  
             else:
                 from_pos, to_pos = action
                 test_env.move_piece(from_pos, to_pos, player)
-                pos = to_pos  # For checking adjacent positions
+                pos = to_pos  
 
-            # Define all possible mills
+            
             mills = [
-                # Horizontal mills
+                
                 [0, 1, 2], [3, 4, 5], [6, 7, 8],
                 [9, 10, 11], [12, 13, 14], [15, 16, 17],
                 [18, 19, 20], [21, 22, 23],
-                # Vertical mills
+                
                 [0, 9, 21], [3, 10, 18], [6, 11, 15],
                 [1, 4, 7], [16, 19, 22], [8, 12, 17],
                 [5, 13, 20], [2, 14, 23]
             ]
 
-            # Check if we have 2 pieces in any potential mill
+            
             for mill in mills:
                 if pos in mill:
                     pieces_count = sum(1 for m_pos in mill if test_env.board[m_pos] == player)
                     empty_count = sum(1 for m_pos in mill if test_env.board[m_pos] == 0)
 
                     if pieces_count == 2 and empty_count == 1:
-                        # We have 2 in a row with the third spot empty
+                        
                         return action
 
-        # Use the trained agent with minimal exploration
+        
         state = env.get_state()
         return agent.act(state, valid_actions, epsilon_override=0.05)
 
 def train_agent(episodes=1000, model_filename="nine_mens_morris_model.pth", resume=False):
     env = NineMensMorrisEnv()
 
-    # Set the device for training
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # Create the agent
+    
     agent = DQNAgent(device=device)
 
-    # Load existing model if resuming training
+    
     if resume and os.path.exists(model_filename):
         agent.load(model_filename)
         start_episode = agent.total_episodes
@@ -688,7 +688,7 @@ def train_agent(episodes=1000, model_filename="nine_mens_morris_model.pth", resu
         total_reward = 0
 
         while not done:
-            # Player 2 (AI) turn
+            
             valid_actions = env.get_valid_actions(2)
             if not valid_actions:
                 break
@@ -698,15 +698,15 @@ def train_agent(episodes=1000, model_filename="nine_mens_morris_model.pth", resu
             agent.remember(state, action, reward, next_state, done)
             total_reward += reward
 
-            # Player 1 (opponent) turn
+            
             if not done:
                 valid_actions_opp = env.get_valid_actions(1)
                 if valid_actions_opp:
-                    # Random opponent for training
+                    
                     opp_action = random.choice(valid_actions_opp)
                     next_state_opp, _, done_opp = env.step(opp_action, 1)
 
-                    # Check if opponent won
+                    
                     if env.check_winner() == 1:
                         reward = -1
                         done = True
@@ -716,9 +716,9 @@ def train_agent(episodes=1000, model_filename="nine_mens_morris_model.pth", resu
                         done = done_opp
                     state = next_state_opp
                 else:
-                    # Opponent has no valid moves
+                    
                     done = True
-                    reward = 1  # AI wins
+                    reward = 1  
                     total_reward += reward
 
             agent.train()
@@ -729,12 +729,12 @@ def train_agent(episodes=1000, model_filename="nine_mens_morris_model.pth", resu
         if e % 100 == 0:
             print(f"Episode: {e+1}, Reward: {total_reward}, Epsilon: {agent.epsilon:.2f}")
 
-        # Save model every 100 episodes
+        
         if (e + 1) % 100 == 0:
             agent.total_episodes = e + 1
             agent.save(model_filename)
 
-    # Save final model
+    
     agent.total_episodes = start_episode + episodes
     agent.save(model_filename)
 
@@ -748,46 +748,46 @@ def print_board(board, highlight=None):
     - board: The game board state (List or Tuple representing positions).
     - highlight: Optional position to highlight (useful for showing last move).
     """
-    # Clear the screen
-    if os.name == 'posix':  # For Unix/Linux/MacOS
+    
+    if os.name == 'posix':  
         os.system('clear')
-    else:  # For Windows
+    else:  
         os.system('cls')
 
-    # Color formatting
+    
     BOLD = "\033[1m"
     RESET = "\033[0m"
     BLUE = "\033[34m"
     RED = "\033[31m"
     GREEN = "\033[32m"
 
-    # Define symbols with fixed width (3 characters)
+    
     symbols = {
-        0: f" {BLUE}\u25CF{RESET} ",  # Empty spot (●)
-        1: f" {RED}X{RESET} ",   # Player 1 (X)
-        2: f" {GREEN}O{RESET} "  # Player 2 (O)
+        0: f" {BLUE}\u25CF{RESET} ",  
+        1: f" {RED}X{RESET} ",   
+        2: f" {GREEN}O{RESET} "  
     }
 
-    # Highlight symbols (also 3 characters with brackets)
+    
     highlight_symbols = {
         0: f"{BLUE}[\u25CF]{RESET}",
         1: f"{RED}[X]{RESET}",
         2: f"{GREEN}[O]{RESET}"
     }
 
-    # Get the symbol for a position
+    
     def sym(pos):
         if highlight is not None and pos == highlight:
             return highlight_symbols[board[pos]]
         else:
             return symbols[board[pos]]
 
-    # Print decorative title
+    
     print("\n" + "╔" + "═" * 38 + "╗")
     print("║" + f"{BOLD}      NINE MEN'S MORRIS GAME      {RESET}" + "║")
     print("╚" + "═" * 38 + "╝\n")
 
-    # Board layout with corrected alignment
+    
     board_layout = (f"""
     {sym(0)}----------{sym(1)}----------{sym(2)}
     |          |                      |
@@ -806,7 +806,7 @@ def print_board(board, highlight=None):
 
     print(board_layout)
 
-    # Clean-up
+    
     print("\n╔" + "═" * 38 + "╗")
     print(f"║ {BOLD}Legend: {RESET}                              ║")
     print(f"║ {RED}X{RESET} - Player 1    {GREEN}O{RESET} - Player 2    {BLUE}\u25CF{RESET} - Empty ║")
@@ -824,15 +824,15 @@ def play_game_vs_ai(agent, difficulty="moderate"):
     env = NineMensMorrisEnv()
     state = env.reset()
 
-    # Determine who goes first
+    
     print("\nWould you like to go first? (y/n)")
     choice = input().lower().strip()
     player_first = choice == 'y'
 
     human_player = 1 if player_first else 2
-    ai_player = 3 - human_player  # Opposite of human player
+    ai_player = 3 - human_player  
 
-    current_player = 1  # Player 1 always starts
+    current_player = 1  
     done = False
     last_move = None
 
@@ -843,12 +843,12 @@ def play_game_vs_ai(agent, difficulty="moderate"):
     while not done:
         print_board(env.board, last_move)
 
-        # Show game information
+        
         print(f"\nPhase: {env.phase.capitalize()}")
         print(f"Player 1 (X): {env.remaining_pieces[1]} pieces to place, {env.pieces_on_board[1]} on board")
         print(f"Player 2 (O): {env.remaining_pieces[2]} pieces to place, {env.pieces_on_board[2]} on board")
 
-        # Human turn
+        
         if current_player == human_player:
             print("\nYour turn!")
 
@@ -858,7 +858,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                 break
 
             if env.phase == 'placement':
-                # Placement phase - choose a position
+                
                 while True:
                     try:
                         print("Enter position to place your piece (0-23):")
@@ -872,22 +872,22 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                     except ValueError:
                         print("Please enter a valid number.")
 
-            else:  # Movement or flying phase
-                # First select piece to move
+            else:  
+                
                 while True:
                     try:
                         print("Enter position of piece to move (0-23):")
                         from_pos = int(input())
 
-                        # Check if this piece can be moved
+                        
                         valid_from = any(action[0] == from_pos for action in valid_actions)
 
                         if valid_from:
-                            # Get valid destinations for this piece
+                            
                             valid_destinations = [action[1] for action in valid_actions if action[0] == from_pos]
                             print(f"Valid destinations: {valid_destinations}")
 
-                            # Now get destination
+                            
                             print("Enter destination position:")
                             to_pos = int(input())
 
@@ -902,7 +902,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                     except ValueError:
                         print("Please enter a valid number.")
 
-            # If a mill was formed, remove an opponent piece
+            
             if formed_mill and env.can_remove(ai_player):
                 print_board(env.board, last_move)
                 print("\nYou formed a mill! Remove an opponent piece.")
@@ -912,7 +912,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                         print("Enter position of opponent piece to remove (0-23):")
                         pos = int(input())
 
-                        # Check if this is a valid piece to remove
+                        
                         if env.board[pos] == ai_player:
                             in_mill = False
                             for mill in env.mills:
@@ -920,7 +920,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                                     in_mill = True
                                     break
 
-                            # If piece is in mill but other pieces are available, can't remove
+                            
                             if in_mill and not env.all_pieces_in_mills(ai_player):
                                 print("Cannot remove a piece that's part of a mill unless no other pieces are available.")
                             else:
@@ -931,10 +931,10 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                     except ValueError:
                         print("Please enter a valid number.")
 
-        # AI turn
+        
         else:
             print(f"\nAI ({difficulty}) is thinking...")
-            time.sleep(1)  # Add a small delay to make it seem like the AI is thinking
+            time.sleep(1)  
 
             valid_actions = env.get_valid_actions(ai_player)
             if not valid_actions:
@@ -953,14 +953,14 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                 last_move = to_pos
                 formed_mill = env.move_piece(from_pos, to_pos, ai_player)
 
-            # If the AI formed a mill, remove a human piece
+            
             if formed_mill and env.can_remove(human_player):
                 print("\nAI formed a mill and removes one of your pieces!")
 
-                # Find a piece to remove - prioritize pieces not in mills
+                
                 removed = False
 
-                # First try to remove pieces not in mills
+                
                 for pos in range(24):
                     if env.board[pos] == human_player:
                         in_mill = False
@@ -975,7 +975,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                             removed = True
                             break
 
-                # If all pieces are in mills, remove any
+                
                 if not removed:
                     for pos in range(24):
                         if env.board[pos] == human_player:
@@ -983,7 +983,7 @@ def play_game_vs_ai(agent, difficulty="moderate"):
                             env.remove_piece(pos, human_player)
                             break
 
-        # Check for winner
+        
         winner = env.check_winner()
         if winner > 0:
             print_board(env.board, last_move)
@@ -994,10 +994,10 @@ def play_game_vs_ai(agent, difficulty="moderate"):
             done = True
             break
 
-        # Switch to the other player
+        
         current_player = 3 - current_player
 
-    # Final board state
+    
     print_board(env.board)
     print("\nGame over!")
 
@@ -1010,7 +1010,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     agent = DQNAgent(device=device)
 
-    # Try to load existing model or train a new one
+    
     if not os.path.exists(model_filename):
         print("\nNo trained model found. Training a new model...")
         print("This might take a few minutes...")
@@ -1049,7 +1049,7 @@ def main():
 
             print(f"Training for {additional_episodes} episodes. This might take a few minutes...")
             train_agent(episodes=additional_episodes, model_filename=model_filename, resume=True)
-            agent.load(model_filename)  # Reload the updated model
+            agent.load(model_filename)  
             print("Training complete!")
 
         elif choice == "3":
